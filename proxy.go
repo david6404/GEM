@@ -63,7 +63,7 @@ const openrestyWelcomeHTML = "<!DOCTYPE html>\n" +
 	"</style>\n" +
 	"</head>\n" +
 	"<body>\n" +
-	"<h1>Welcome to OpenResty!</h1\n" +
+	"<h1>Welcome to OpenResty!</h1>\n" +
 	"<p>If you see this page, the OpenResty web platform is successfully installed and\n" +
 	"working. Further configuration is required.</p>\n" +
 	"\n" +
@@ -409,14 +409,9 @@ func (g *Gateway) Handler() http.Handler {
 	})
 }
 
+// validXHTTP permits both POST (uplink stream) and GET (downlink stream)
 func (g *Gateway) validXHTTP(r *http.Request) bool {
-	switch r.Method {
-	case http.MethodPost:
-		return true
-	case http.MethodGet:
-		return strings.Trim(strings.TrimPrefix(r.URL.Path, g.pathXH), "/") != ""
-	}
-	return false
+	return r.Method == http.MethodPost || r.Method == http.MethodGet
 }
 
 func headerHasToken(h http.Header, key, token string) bool {
