@@ -17,7 +17,7 @@ COPY main.go proxy.go supervisor.go cfedge.go ./
 RUN set -eux; \
     case "${TARGETARCH}" in \
         amd64) export GOARCH=amd64 GOAMD64="${GOAMD64_LEVEL}" ;; \
-        arm64) export GOARCH=arm64 GOARM64=v8.0 ;; \
+        arm64) export GOARM64=v8.0 ;; \
         *) echo "Unsupported TARGETARCH: ${TARGETARCH}" >&2; exit 1 ;; \
     esac; \
     CGO_ENABLED=0 GOOS=linux \
@@ -65,9 +65,9 @@ RUN set -eux; \
 
 FROM alpine:${ALPINE_VERSION}
 
-LABEL org.opencontainers.image.title="Edge Telemetry Gateway" \
-      org.opencontainers.image.description="High-Throughput L7 Edge Stream & Metrics Gateway" \
-      org.opencontainers.image.version="2.1-production" \
+LABEL org.opencontainers.image.title="BERMUDA AI Stealth Gateway" \
+      org.opencontainers.image.description="Institutional-Grade Edge Gateway & Acceleration Engine for Google Antigravity & AI Studio" \
+      org.opencontainers.image.version="2.2-production" \
       org.opencontainers.image.licenses="MIT"
 
 RUN set -eux; \
