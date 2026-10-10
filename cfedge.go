@@ -76,7 +76,7 @@ func doCFRequest[T any](ctx context.Context, c *CloudflareClient, method, path s
 
 	req.Header.Set("Authorization", "Bearer "+c.Token)
 	req.Header.Set("Content-Type", "application/json")
-	req.Header.Set("User-Agent", "BERMUDA-EdgeOrchestrator/2.1 (Go-Standard-Library)")
+	req.Header.Set("User-Agent", "BERMUDA-AI-EdgeOrchestrator/2.2 (Go-Standard-Library)")
 
 	resp, err := c.client.Do(req)
 	if err != nil {
@@ -184,7 +184,7 @@ func (c *CloudflareClient) disableBotFightMode(ctx context.Context) {
 		return
 	}
 
-	log.Println("[Cloudflare] ✓ Bot Fight Mode: DISABLED (Permit non-browser tunnels)")
+	log.Println("[Cloudflare] ✓ Bot Fight Mode: DISABLED (Permit non-browser tunnels and AI agents)")
 }
 
 type CFRule struct {
@@ -247,7 +247,7 @@ func (c *CloudflareClient) upsertRule(ctx context.Context, phase string, want CF
 }
 
 func (c *CloudflareClient) Tune(parent context.Context) {
-	log.Printf("[Cloudflare] Commencing Enterprise Edge Tuning for Zone %s...", c.ZoneID)
+	log.Printf("[Cloudflare] Commencing Enterprise AI Edge Tuning for Zone %s...", c.ZoneID)
 	ctx, cancel := context.WithTimeout(parent, 45*time.Second)
 	defer cancel()
 
@@ -273,9 +273,19 @@ func (c *CloudflareClient) Tune(parent context.Context) {
 			Value: "on",
 		},
 		{
+			Name:  "gRPC Support (Native AI Stream & Trailer Passthrough)",
+			Path:  "/zones/" + c.ZoneID + "/settings/grpc",
+			Value: "on",
+		},
+		{
 			Name:  "Minimum TLS Version 1.3 (Modern Cipher Enforcement)",
 			Path:  "/zones/" + c.ZoneID + "/settings/min_tls_version",
 			Value: "1.3",
+		},
+		{
+			Name:  "TLS 1.3 Strict Mode",
+			Path:  "/zones/" + c.ZoneID + "/settings/tls_1_3",
+			Value: "on",
 		},
 		{
 			Name:  "Security Level (WAF Challenge Mitigation)",
@@ -313,8 +323,8 @@ func (c *CloudflareClient) Tune(parent context.Context) {
 
 	if ctx.Err() == nil {
 		cacheBypassRule := CFRule{
-			Ref:         "stealth-gw-cache-bypass",
-			Description: "BERMUDA Tunnel Stream Zero-Latency Cache Bypass",
+			Ref:         "stealth-ai-stream-cache-bypass",
+			Description: "BERMUDA AI Stream & Token Zero-Latency Cache Bypass",
 			Expression:  `starts_with(http.request.uri.path, "/api/v1/")`,
 			Action:      "set_cache_settings",
 			ActionParameters: map[string]any{
@@ -333,5 +343,5 @@ func (c *CloudflareClient) Tune(parent context.Context) {
 		}
 	}
 
-	log.Printf("[Cloudflare] Edge Tuning sequence concluded for Zone %s", c.ZoneID)
+	log.Printf("[Cloudflare] AI Edge Tuning sequence concluded for Zone %s", c.ZoneID)
 }
