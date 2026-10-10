@@ -5,29 +5,42 @@
   },
   "dns": {
     "servers": [
+      {
+        "address": "https://1.1.1.1/dns-query",
+        "domains": [
+          "domain:google",
+          "domain:googleapis.com",
+          "domain:antigravity.google",
+          "domain:googleusercontent.com",
+          "geosite:google",
+          "geosite:google-gemini"
+        ],
+        "skipFallback": true,
+        "queryStrategy": "UseIPv4"
+      },
       "https://1.1.1.1/dns-query",
       "https://8.8.8.8/dns-query",
       "https://8.8.4.4/dns-query"
     ],
-    "queryStrategy": "UseIP",
+    "queryStrategy": "UseIPv4",
     "disableCache": false,
     "disableFallback": true
   },
   "policy": {
     "levels": {
       "0": {
-        "handshake": 10,
-        "connIdle": 300,
+        "handshake": 15,
+        "connIdle": 900,
         "uplinkOnly": 2,
         "downlinkOnly": 2,
-        "bufferSize": 512
+        "bufferSize": 1024
       },
       "1": {
-        "handshake": 10,
-        "connIdle": 300,
+        "handshake": 15,
+        "connIdle": 900,
         "uplinkOnly": 2,
         "downlinkOnly": 2,
-        "bufferSize": 512
+        "bufferSize": 1024
       }
     },
     "system": {
@@ -66,9 +79,9 @@
           "mode": "auto",
           "xPaddingBytes": "100-1000",
           "noSSEHeader": false,
-          "scMaxEachPostBytes": 1000000,
-          "scMaxBufferedPosts": 30,
-          "scStreamUpServerSecs": "20-50"
+          "scMaxEachPostBytes": 2000000,
+          "scMaxBufferedPosts": 60,
+          "scStreamUpServerSecs": "30-90"
         }
       },
       "sniffing": {
@@ -106,7 +119,7 @@
         "security": "none",
         "wsSettings": {
           "path": "/api/v1/live",
-          "heartbeatPeriod": 30
+          "heartbeatPeriod": 20
         }
       },
       "sniffing": {
@@ -143,7 +156,7 @@
         "security": "none",
         "wsSettings": {
           "path": "/api/v1/gateway",
-          "heartbeatPeriod": 30
+          "heartbeatPeriod": 20
         }
       },
       "sniffing": {
@@ -158,6 +171,38 @@
     }
   ],
   "outbounds": [
+    {
+      "tag": "google-clean-ipv4",
+      "protocol": "freedom",
+      "settings": {
+        "targetStrategy": "UseIPv4"
+      },
+      "streamSettings": {
+        "sockopt": {
+          "domainStrategy": "UseIPv4",
+          "tcpNoDelay": true,
+          "tcpKeepAliveIdle": 60,
+          "tcpKeepAliveInterval": 15,
+          "tcpUserTimeout": 120000
+        }
+      }
+    },
+    {
+      "tag": "direct-ipv4",
+      "protocol": "freedom",
+      "settings": {
+        "targetStrategy": "AsIs"
+      },
+      "streamSettings": {
+        "sockopt": {
+          "domainStrategy": "UseIPv4",
+          "tcpNoDelay": true,
+          "tcpKeepAliveIdle": 45,
+          "tcpKeepAliveInterval": 10,
+          "tcpUserTimeout": 60000
+        }
+      }
+    },
     {
       "tag": "direct-ipv6",
       "protocol": "freedom",
@@ -181,22 +226,6 @@
       }
     },
     {
-      "tag": "direct-ipv4",
-      "protocol": "freedom",
-      "settings": {
-        "targetStrategy": "AsIs"
-      },
-      "streamSettings": {
-        "sockopt": {
-          "domainStrategy": "UseIPv4",
-          "tcpNoDelay": true,
-          "tcpKeepAliveIdle": 45,
-          "tcpKeepAliveInterval": 10,
-          "tcpUserTimeout": 60000
-        }
-      }
-    },
-    {
       "tag": "block",
       "protocol": "blackhole",
       "settings": {
@@ -212,7 +241,7 @@
     }
   ],
   "routing": {
-    "domainStrategy": "IPOnDemand",
+    "domainStrategy": "IPIfNonMatch",
     "rules": [
       {
         "type": "field",
@@ -291,6 +320,25 @@
           "geosite:category-ads-all"
         ],
         "outboundTag": "block"
+      },
+      {
+        "type": "field",
+        "domain": [
+          "domain:antigravity.google",
+          "domain:generativelanguage.googleapis.com",
+          "domain:cloudcode-pa.googleapis.com",
+          "domain:daily-cloudcode-pa.googleapis.com",
+          "domain:aicode.googleapis.com",
+          "domain:alkalimakersuite-pa.clients6.google.com",
+          "domain:aistudio.google.com",
+          "domain:gemini.google.com",
+          "geosite:google-gemini",
+          "domain:oauth2.googleapis.com",
+          "domain:accounts.google.com",
+          "domain:googleapis.com",
+          "geosite:google"
+        ],
+        "outboundTag": "google-clean-ipv4"
       },
       {
         "type": "field",
