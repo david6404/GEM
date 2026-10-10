@@ -22,12 +22,13 @@ const (
 	fallbackSelfMemMB      = 128
 	fallbackXrayMemMB      = 550
 	defaultGOMAXPROCS      = 2
-	gatewayMemPercent      = 12
+	gatewayMemPercent      = 15
 	xrayMemPercent         = 55
-	httpDrainTimeout       = 10 * time.Second
+	httpDrainTimeout       = 12 * time.Second
 	edgeKeepAlivePeriod    = 15 * time.Second
 	drainPropagationWindow = 500 * time.Millisecond
 	tcpUserTimeoutOpt      = 18
+	tcpUserTimeoutMS       = 120000
 )
 
 func cgroupMemoryLimit() (uint64, bool) {
@@ -61,7 +62,7 @@ func deriveMemoryBudget() (gwMB, xrayMB int) {
 		gwMB = totalMB * gatewayMemPercent / 100
 		xrayMB = totalMB * xrayMemPercent / 100
 
-		allowedMB := totalMB * 67 / 100
+		allowedMB := totalMB * 70 / 100
 		if gwMB < 32 {
 			gwMB = 32
 		}
@@ -69,8 +70,8 @@ func deriveMemoryBudget() (gwMB, xrayMB int) {
 			xrayMB = 64
 		}
 		if total := gwMB + xrayMB; total > allowedMB && allowedMB >= 96 {
-			gwMB = allowedMB * gatewayMemPercent / 67
-			xrayMB = allowedMB * xrayMemPercent / 67
+			gwMB = allowedMB * gatewayMemPercent / 70
+			xrayMB = allowedMB * xrayMemPercent / 70
 		}
 	}
 
@@ -153,8 +154,8 @@ func teardown(srv *http.Server, gw *Gateway, sup *Supervisor, supCancel context.
 		}
 		cancelHTTP()
 
-		log.Println("[Gateway] Stage 3/5: Waiting for active WebSocket/hijacked tunnels to conclude...")
-		tunnelDeadline := minTime(hardDeadline.Add(-8*time.Second), time.Now().Add(httpDrainTimeout))
+		log.Println("[Gateway] Stage 3/5: Waiting for active WebSocket/AI streaming tunnels to conclude...")
+		tunnelDeadline := minTime(hardDeadline.Add(-6*time.Second), time.Now().Add(httpDrainTimeout))
 		if tunnelDeadline.After(time.Now()) {
 			tunnelCtx, cancelTunnel := context.WithDeadline(context.Background(), tunnelDeadline)
 			gw.WaitTunnels(tunnelCtx)
@@ -179,7 +180,7 @@ func teardown(srv *http.Server, gw *Gateway, sup *Supervisor, supCancel context.
 
 func main() {
 	log.SetFlags(log.LstdFlags | log.LUTC)
-	log.Println("[Gateway] Initializing BERMUDA Stealth Gateway NG...")
+	log.Println("[Gateway] Initializing BERMUDA AI Gateway (Engineered for Google Antigravity & AI Studio)...")
 
 	gwMB, xrayMB := deriveMemoryBudget()
 	applyMemoryCeiling(gwMB)
@@ -220,11 +221,11 @@ func main() {
 	srv := &http.Server{
 		Addr:              ":" + port,
 		Handler:           gw.Handler(),
-		ReadHeaderTimeout: 10 * time.Second,
-		ReadTimeout:       30 * time.Second,
+		ReadHeaderTimeout: 15 * time.Second,
+		ReadTimeout:       0,
 		WriteTimeout:      0,
-		IdleTimeout:       16 * time.Minute,
-		MaxHeaderBytes:    32 << 10,
+		IdleTimeout:       30 * time.Minute,
+		MaxHeaderBytes:    64 << 10,
 		ConnState:         gw.TrackConnState,
 	}
 
@@ -233,12 +234,15 @@ func main() {
 			Enable:   true,
 			Idle:     edgeKeepAlivePeriod,
 			Interval: edgeKeepAlivePeriod,
-			Count:    4,
+			Count:    5,
 		},
 		Control: func(network, address string, c syscall.RawConn) error {
 			var controlErr error
 			err := c.Control(func(fd uintptr) {
-				if e := syscall.SetsockoptInt(int(fd), syscall.IPPROTO_TCP, tcpUserTimeoutOpt, 90000); e != nil {
+				if e := syscall.SetsockoptInt(int(fd), syscall.IPPROTO_TCP, tcpUserTimeoutOpt, tcpUserTimeoutMS); e != nil {
+					controlErr = e
+				}
+				if e := syscall.SetsockoptInt(int(fd), syscall.SOL_SOCKET, syscall.SO_KEEPALIVE, 1); e != nil {
 					controlErr = e
 				}
 			})
@@ -256,7 +260,7 @@ func main() {
 
 	serverErrCh := make(chan error, 1)
 	go func() {
-		log.Printf("[Gateway] Edge listener active on :%s (PID %d, GOMAXPROCS=%d)", port, os.Getpid(), procs)
+		log.Printf("[Gateway] AI Edge listener active on :%s (PID %d, GOMAXPROCS=%d)", port, os.Getpid(), procs)
 		if err := srv.Serve(ln); err != nil && !errors.Is(err, http.ErrServerClosed) {
 			serverErrCh <- err
 		}
@@ -278,5 +282,5 @@ func main() {
 	}
 
 	teardown(srv, gw, sup, supCancel, true)
-	log.Println("[Gateway] BERMUDA Stealth Gateway shutdown complete. Ports released cleanly. Exit 0.")
+	log.Println("[Gateway] BERMUDA AI Gateway shutdown complete. Ports released cleanly. Exit 0.")
 }
