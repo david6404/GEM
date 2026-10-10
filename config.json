@@ -15,16 +15,17 @@
           "geosite:google",
           "geosite:google-gemini"
         ],
-        "skipFallback": true,
+        "skipFallback": false,
         "queryStrategy": "UseIPv4"
       },
       "https://1.1.1.1/dns-query",
       "https://8.8.8.8/dns-query",
-      "https://8.8.4.4/dns-query"
+      "8.8.8.8",
+      "1.1.1.1"
     ],
     "queryStrategy": "UseIPv4",
     "disableCache": false,
-    "disableFallback": true
+    "disableFallback": false
   },
   "policy": {
     "levels": {
@@ -74,6 +75,12 @@
       "streamSettings": {
         "network": "xhttp",
         "security": "none",
+        "sockopt": {
+          "trustedXForwardedFor": [
+            "127.0.0.1/32",
+            "::1/128"
+          ]
+        },
         "xhttpSettings": {
           "path": "/api/v1/sync",
           "mode": "auto",
@@ -117,6 +124,12 @@
       "streamSettings": {
         "network": "ws",
         "security": "none",
+        "sockopt": {
+          "trustedXForwardedFor": [
+            "127.0.0.1/32",
+            "::1/128"
+          ]
+        },
         "wsSettings": {
           "path": "/api/v1/live",
           "heartbeatPeriod": 20
@@ -154,6 +167,12 @@
       "streamSettings": {
         "network": "ws",
         "security": "none",
+        "sockopt": {
+          "trustedXForwardedFor": [
+            "127.0.0.1/32",
+            "::1/128"
+          ]
+        },
         "wsSettings": {
           "path": "/api/v1/gateway",
           "heartbeatPeriod": 20
@@ -174,9 +193,7 @@
     {
       "tag": "google-clean-ipv4",
       "protocol": "freedom",
-      "settings": {
-        "targetStrategy": "UseIPv4"
-      },
+      "settings": {},
       "streamSettings": {
         "sockopt": {
           "domainStrategy": "UseIPv4",
@@ -190,9 +207,7 @@
     {
       "tag": "direct-ipv4",
       "protocol": "freedom",
-      "settings": {
-        "targetStrategy": "AsIs"
-      },
+      "settings": {},
       "streamSettings": {
         "sockopt": {
           "domainStrategy": "UseIPv4",
@@ -206,9 +221,7 @@
     {
       "tag": "direct-ipv6",
       "protocol": "freedom",
-      "settings": {
-        "targetStrategy": "AsIs"
-      },
+      "settings": {},
       "streamSettings": {
         "sockopt": {
           "domainStrategy": "UseIP",
