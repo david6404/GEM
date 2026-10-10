@@ -31,18 +31,18 @@ const (
 	defaultLoopbackWS = "127.0.0.1:18444"
 	defaultLoopbackTR = "127.0.0.1:18445"
 
-	fastProbeWindow       = 1500 * time.Millisecond
-	fastProbeInterval     = 25 * time.Millisecond
-	slowProbeInterval     = 3 * time.Second
-	degradedProbeInterval = 250 * time.Millisecond
+	fastProbeWindow       = 2000 * time.Millisecond
+	fastProbeInterval     = 50 * time.Millisecond
+	slowProbeInterval     = 5 * time.Second
+	degradedProbeInterval = 500 * time.Millisecond
 	minProbeNowInterval   = 1 * time.Second
-	probeDialTimeout      = 250 * time.Millisecond
-	defaultStartTimeout   = 10 * time.Second
-	defaultStopTimeout    = 8 * time.Second
+	probeDialTimeout      = 800 * time.Millisecond
+	defaultStartTimeout   = 15 * time.Second
+	defaultStopTimeout    = 10 * time.Second
 	pipeReadBufferSize    = 64 * 1024
 
 	stableWindow       = 60 * time.Second
-	initialBackoff     = 80 * time.Millisecond
+	initialBackoff     = 100 * time.Millisecond
 	maxBackoffInterval = 5 * time.Second
 	backoffJitterFrac  = 0.20
 
@@ -249,13 +249,13 @@ func (s *Supervisor) childEnv() []string {
 }
 
 func (s *Supervisor) Preflight() error {
-	ctx, cancel := context.WithTimeout(context.Background(), 10*time.Second)
+	ctx, cancel := context.WithTimeout(context.Background(), 15*time.Second)
 	defer cancel()
 	return s.PreflightContext(ctx)
 }
 
 func (s *Supervisor) PreflightContext(parent context.Context) error {
-	ctx, cancel := context.WithTimeout(parent, 10*time.Second)
+	ctx, cancel := context.WithTimeout(parent, 15*time.Second)
 	defer cancel()
 
 	if s.reaper == nil {
