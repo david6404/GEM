@@ -39,10 +39,11 @@ const (
 	defaultProxyBufferSize  = 64 * 1024
 	defaultTransportBufSize = 64 * 1024
 	bufferPoolCapacity      = 64
-	halfCloseGrace          = 25 * time.Second
+	halfCloseGrace          = 60 * time.Second
 	backendDialTimeout      = 5 * time.Second
-	backendHandshakeTimeout = 5 * time.Second
+	backendHandshakeTimeout = 10 * time.Second
 	tunnelDrainPollInterval = 50 * time.Millisecond
+	tcpKeepAlivePeriod      = 15 * time.Second
 )
 
 var openrestyModTime = time.Date(2021, time.August, 6, 21, 32, 34, 0, time.UTC)
@@ -62,7 +63,7 @@ const openrestyWelcomeHTML = "<!DOCTYPE html>\n" +
 	"</style>\n" +
 	"</head>\n" +
 	"<body>\n" +
-	"<h1>Welcome to OpenResty!</h1>\n" +
+	"<h1>Welcome to OpenResty!</h1\n" +
 	"<p>If you see this page, the OpenResty web platform is successfully installed and\n" +
 	"working. Further configuration is required.</p>\n" +
 	"\n" +
@@ -193,7 +194,7 @@ func newGateway(sup *Supervisor, proxyBuf, transportBuf int) *Gateway {
 		bufPool:    newRecycledBufferPool(proxyBuf),
 		tunnels:    make(map[*net.TCPConn]struct{}),
 		startedAt:  time.Now(),
-		dialer:     net.Dialer{Timeout: backendDialTimeout, KeepAlive: -1},
+		dialer:     net.Dialer{Timeout: backendDialTimeout, KeepAlive: tcpKeepAlivePeriod},
 	}
 	g.tr = newLoopbackTransport(transportBuf)
 	proxy, err := newBackendProxy(g.backendXH, g.tr, g.bufPool)
@@ -205,20 +206,20 @@ func newGateway(sup *Supervisor, proxyBuf, transportBuf int) *Gateway {
 }
 
 func newLoopbackTransport(bufSize int) *http.Transport {
-	bufSize = min(max(bufSize, 4<<10), 64<<10)
-	dialer := &net.Dialer{Timeout: 5 * time.Second, KeepAlive: -1}
+	bufSize = min(max(bufSize, 4<<10), 128<<10)
+	dialer := &net.Dialer{Timeout: 5 * time.Second, KeepAlive: tcpKeepAlivePeriod}
 	return &http.Transport{
 		Proxy:                 nil,
 		DialContext:           dialer.DialContext,
 		ForceAttemptHTTP2:     false,
-		MaxIdleConns:          128,
-		MaxIdleConnsPerHost:   64,
-		MaxConnsPerHost:       128,
-		IdleConnTimeout:       90 * time.Second,
+		MaxIdleConns:          256,
+		MaxIdleConnsPerHost:   128,
+		MaxConnsPerHost:       256,
+		IdleConnTimeout:       300 * time.Second,
 		DisableCompression:    true,
 		ReadBufferSize:        bufSize,
 		WriteBufferSize:       bufSize,
-		ResponseHeaderTimeout: 120 * time.Second,
+		ResponseHeaderTimeout: 300 * time.Second,
 		ExpectContinueTimeout: 1 * time.Second,
 	}
 }
@@ -241,8 +242,12 @@ func newBackendProxy(targetAddr string, tr http.RoundTripper, bp httputil.Buffer
 			pr.Out.Host = pr.In.Host
 			pr.SetXForwarded()
 			pr.Out.Header.Set("X-Accel-Buffering", "no")
+			pr.Out.Header.Set("Cache-Control", "no-cache, no-transform")
 			if cfIP := pr.In.Header.Get("CF-Connecting-IP"); cfIP != "" {
 				pr.Out.Header.Set("CF-Connecting-IP", cfIP)
+			}
+			if te := pr.In.Header.Get("TE"); te != "" {
+				pr.Out.Header.Set("TE", te)
 			}
 		},
 		ModifyResponse: func(res *http.Response) error {
@@ -253,7 +258,7 @@ func newBackendProxy(targetAddr string, tr http.RoundTripper, bp httputil.Buffer
 				rewriteTo405(res)
 			default:
 				res.Header.Set("X-Accel-Buffering", "no")
-				res.Header.Set("Cache-Control", "no-cache, no-store, must-revalidate")
+				res.Header.Set("Cache-Control", "no-cache, no-store, must-revalidate, no-transform")
 				res.Header.Set("Server", openrestyServerToken)
 			}
 			return nil
@@ -463,7 +468,10 @@ func (g *Gateway) serveWS(w http.ResponseWriter, r *http.Request, backend string
 		return
 	}
 
+	_ = bc.SetKeepAlive(true)
+	_ = bc.SetKeepAlivePeriod(tcpKeepAlivePeriod)
 	_ = bc.SetDeadline(time.Now().Add(backendHandshakeTimeout))
+
 	out := r.Clone(r.Context())
 	out.RequestURI = ""
 	out.Body = http.NoBody
@@ -510,6 +518,9 @@ func (g *Gateway) serveWS(w http.ResponseWriter, r *http.Request, backend string
 		return
 	}
 
+	_ = ct.SetKeepAlive(true)
+	_ = ct.SetKeepAlivePeriod(tcpKeepAlivePeriod)
+
 	if !g.track(ct, bc) {
 		_ = ct.Close()
 		_ = bc.Close()
@@ -552,8 +563,8 @@ func (g *Gateway) serveWS(w http.ResponseWriter, r *http.Request, backend string
 
 func (g *Gateway) relay(client, backend *net.TCPConn) {
 	done := make(chan struct{}, 2)
-	go pipe(backend, client, done)
-	go pipe(client, backend, done)
+	go g.pipe(backend, client, done)
+	go g.pipe(client, backend, done)
 
 	<-done
 
@@ -564,9 +575,12 @@ func (g *Gateway) relay(client, backend *net.TCPConn) {
 	<-done
 }
 
-func pipe(dst, src *net.TCPConn, done chan<- struct{}) {
+func (g *Gateway) pipe(dst, src *net.TCPConn, done chan<- struct{}) {
 	defer func() { done <- struct{}{} }()
-	_, err := io.Copy(dst, src)
+	buf := g.bufPool.Get()
+	defer g.bufPool.Put(buf)
+
+	_, err := io.CopyBuffer(dst, src, buf)
 	if err != nil {
 		_ = dst.Close()
 		_ = src.Close()
